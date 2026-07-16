@@ -3,7 +3,7 @@ package authentication
 import (
 	"context"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type ContentAuthentication interface {
@@ -14,5 +14,5 @@ type ContentAuthentication interface {
 type customClaims struct {
 	CategoryIDs []int32 `json:"category_ids"`
 	PostIDs     []int32 `json:"post_ids"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }

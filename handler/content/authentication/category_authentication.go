@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/go-sonic/sonic/model/entity"
 	"github.com/go-sonic/sonic/model/property"
@@ -129,9 +129,9 @@ func (c *CategoryAuthentication) doAuthenticate(ctx context.Context, tokenStr st
 	}
 	if claims == nil {
 		claims = &customClaims{
-			StandardClaims: jwt.StandardClaims{
-				ExpiresAt: time.Now().Add(time.Minute * 1).Unix(),
-				IssuedAt:  time.Now().Unix(),
+			RegisteredClaims: jwt.RegisteredClaims{
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 1)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
 			},
 		}
 	}
