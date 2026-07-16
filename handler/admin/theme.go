@@ -294,7 +294,12 @@ func (t *ThemeHandler) FetchTheme(ctx *gin.Context) (interface{}, error) {
 }
 
 func (t *ThemeHandler) UpdateThemeByFetching(ctx *gin.Context) (interface{}, error) {
-	return nil, xerr.WithMsg(nil, "not support").WithStatus(xerr.StatusInternalServerError)
+	themeID, err := util.ParamString(ctx, "themeID")
+	if err != nil {
+		return nil, err
+	}
+	// 在线更新使用主题自身记录的 repo 地址，无需前端传入 uri
+	return t.ThemeService.UpdateThemeByFetching(ctx, themeID, "")
 }
 
 func (t *ThemeHandler) ReloadTheme(ctx *gin.Context) (interface{}, error) {

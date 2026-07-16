@@ -414,11 +414,27 @@ func (t *themeServiceImpl) UpdateThemeByUpload(ctx context.Context, themeID stri
 	if err != nil {
 		return nil, err
 	}
+	// 校验新主题与旧主题为同一主题（id 一致）
+	if newThemeProperty.ID != oldThemeProperty.ID {
+		return nil, xerr.WithMsg(nil, "theme id mismatch, uploaded theme is not the same theme").WithStatus(xerr.StatusBadRequest)
+	}
+	// 校验旧主题路径位于主题目录之下，防止误删
+	themeDir := filepath.Clean(t.Config.Sonic.ThemeDir)
+	oldPath := filepath.Clean(oldThemeProperty.ThemePath)
+	if oldPath == themeDir || !strings.HasPrefix(oldPath, themeDir+string(filepath.Separator)) {
+		return nil, xerr.WithMsg(nil, "invalid old theme path").WithStatus(xerr.StatusInternalServerError)
+	}
 	err = os.RemoveAll(oldThemeProperty.ThemePath)
 	if err != nil {
 		return nil, xerr.WithMsg(err, "delete old theme err").WithStatus(xerr.StatusInternalServerError)
 	}
-	return t.addTheme(ctx, newThemeProperty)
+	// 拷到原目录名，保持目录名不变，避免资源路径失效
+	destPath := filepath.Join(themeDir, oldThemeProperty.FolderName)
+	err = util.CopyDir(newThemeProperty.ThemePath, destPath)
+	if err != nil {
+		return nil, xerr.WithStatus(err, xerr.StatusBadRequest).WithMsg("copy new theme err")
+	}
+	return t.PropertyScanner.ReadThemeProperty(ctx, destPath)
 }
 
 func (t *themeServiceImpl) ReloadTheme(ctx context.Context) error {
@@ -483,4 +499,44 @@ func (t *themeServiceImpl) Fetch(ctx context.Context, themeURL string) (*dto.The
 		return nil, xerr.WithStatus(err, xerr.StatusBadRequest).WithMsg(err.Error())
 	}
 	return t.addTheme(ctx, fetchTheme)
+}
+
+func (t *themeServiceImpl) UpdateThemeByFetching(ctx context.Context, themeID, themeURL string) (*dto.ThemeProperty, error) {
+	oldThemeProperty, err := t.GetThemeByID(ctx, themeID)
+	if err != nil {
+		return nil, err
+	}
+	// 在线更新使用主题自身记录的仓库地址（theme.yaml 的 repo 字段）
+	themeURL = strings.TrimSpace(themeURL)
+	if themeURL == "" {
+		themeURL = strings.TrimSpace(oldThemeProperty.Repo)
+	}
+	if themeURL == "" {
+		return nil, xerr.WithMsg(nil, "theme repo url is empty, please set repo in theme.yaml").WithStatus(xerr.StatusBadRequest)
+	}
+	newThemeProperty, err := t.ThemeFetchers.GitRepoThemeFetcher.FetchTheme(ctx, themeURL)
+	if err != nil {
+		return nil, xerr.WithStatus(err, xerr.StatusBadRequest).WithMsg(err.Error())
+	}
+	// 校验新主题与旧主题为同一主题（id 一致），防止更新成其他主题
+	if newThemeProperty.ID != oldThemeProperty.ID {
+		return nil, xerr.WithMsg(nil, "theme id mismatch, fetched theme is not the same theme").WithStatus(xerr.StatusBadRequest)
+	}
+	// 校验旧主题路径确实位于主题目录之下，防止误删
+	themeDir := filepath.Clean(t.Config.Sonic.ThemeDir)
+	oldPath := filepath.Clean(oldThemeProperty.ThemePath)
+	if oldPath == themeDir || !strings.HasPrefix(oldPath, themeDir+string(filepath.Separator)) {
+		return nil, xerr.WithMsg(nil, "invalid old theme path").WithStatus(xerr.StatusInternalServerError)
+	}
+	// 先删旧主题目录，再把新主题拷到原目录名（保持目录名不变，避免资源路径失效）
+	err = os.RemoveAll(oldThemeProperty.ThemePath)
+	if err != nil {
+		return nil, xerr.WithMsg(err, "delete old theme err").WithStatus(xerr.StatusInternalServerError)
+	}
+	destPath := filepath.Join(themeDir, oldThemeProperty.FolderName)
+	err = util.CopyDir(newThemeProperty.ThemePath, destPath)
+	if err != nil {
+		return nil, xerr.WithStatus(err, xerr.StatusBadRequest).WithMsg("copy new theme err")
+	}
+	return t.PropertyScanner.ReadThemeProperty(ctx, destPath)
 }
