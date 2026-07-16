@@ -92,6 +92,7 @@ See: https://hub.docker.com/r/gosonic/sonic
 | [Earth](https://github.com/Meepoljdx/sonic-theme-earth) |
 | [PaperMod](https://github.com/jakezhu9/sonic-theme-papermod) |
 | [Tink](https://github.com/raisons/sonic-theme-tink) |
+| [mtjo_blog](https://github.com/mtjo/sonic-theme-mtjo) |
 
 ## TODO
 - [ ] i18n
